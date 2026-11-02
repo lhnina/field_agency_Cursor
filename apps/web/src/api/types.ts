@@ -171,6 +171,8 @@ export type BillingPeriod = {
   start_date: string;
   end_date: string;
   status: string;
+  closed_at?: string | null;
+  reopen_reason?: string | null;
 };
 
 export type BillingDraftLine = {
@@ -224,9 +226,86 @@ export type ErpExportBatch = {
   row_count: number;
   period_label?: string | null;
   error_message?: string | null;
+  retry_count?: number;
+  ack_reference?: string | null;
   created_at: string;
   sent_at?: string | null;
+  acked_at?: string | null;
   content_preview?: string | null;
+};
+
+export type Zone = {
+  id: string;
+  organization_id: string;
+  code: string;
+  name: string;
+  active: boolean;
+};
+
+export type Budget = {
+  id: string;
+  organization_id: string;
+  client_id: string;
+  client_name?: string | null;
+  brand_id?: string | null;
+  number: string;
+  title: string;
+  contract_type: string;
+  status: string;
+  valid_until?: string | null;
+  lines: unknown[];
+  total_amount: string;
+  resulting_contract_id?: string | null;
+  resulting_campaign_id?: string | null;
+  created_at: string;
+};
+
+export type Campaign = {
+  id: string;
+  organization_id: string;
+  client_id: string;
+  brand_id?: string | null;
+  contract_id?: string | null;
+  budget_id?: string | null;
+  name: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  status: string;
+  created_at: string;
+};
+
+export type Notification = {
+  id: string;
+  kind: string;
+  title: string;
+  body: string;
+  read: boolean;
+  entity_type?: string | null;
+  entity_id?: string | null;
+  created_at: string;
+};
+
+export type EmailOutbox = {
+  id: string;
+  to_address: string;
+  subject: string;
+  body: string;
+  status: string;
+  related_kind?: string | null;
+  related_id?: string | null;
+  created_at: string;
+  sent_at?: string | null;
+};
+
+export type AuditLog = {
+  id: string;
+  actor_user_id?: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+  created_at: string;
 };
 
 export type Margin = {

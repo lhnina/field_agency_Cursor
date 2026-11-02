@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -14,8 +15,11 @@ import {
   CalendarOff,
   Clock3,
   Wallet,
+  ScrollText,
 } from "lucide-react";
 import { useAuth } from "@/api/auth";
+import { apiFetch } from "@/api/client";
+import type { Notification } from "@/api/types";
 import { initials } from "@/lib/labels";
 
 const NAV = [
@@ -28,6 +32,7 @@ const NAV = [
       { to: "/horas", label: "Validação horas", icon: Clock3 },
       { to: "/colaboradores", label: "Colaboradores", icon: Users },
       { to: "/contratos", label: "Contratos", icon: FileText },
+      { to: "/orcamentos", label: "Orçamentos", icon: ScrollText },
     ],
   },
   {
@@ -41,6 +46,7 @@ const NAV = [
     section: "Gestão",
     items: [
       { to: "/faturacao", label: "Pré-faturação / PHC", icon: Wallet },
+      { to: "/notificacoes", label: "Notificações", icon: Bell },
       { to: "/rentabilidade", label: "Rentabilidade", icon: BarChart3 },
       { to: "/definicoes", label: "Definições", icon: Settings },
     ],
@@ -48,7 +54,15 @@ const NAV = [
 ];
 
 export function AppShell() {
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    if (!token) return;
+    apiFetch<Notification[]>("/notifications?unread_only=true", { token })
+      .then((rows) => setUnread(rows.length))
+      .catch(() => setUnread(0));
+  }, [token]);
 
   return (
     <div className="grid min-h-screen grid-cols-1 md:grid-cols-[var(--fo-sidebar-w)_1fr]">
@@ -93,7 +107,7 @@ export function AppShell() {
           ))}
         </nav>
         <div className="border-t border-fo-sidebar-border px-3 py-3 text-xs text-fo-ink-muted">
-          MVP · PR1 foundation
+          MVP · PR4 gaps
         </div>
       </aside>
 
@@ -110,10 +124,16 @@ export function AppShell() {
             />
           </div>
           <div className="ml-auto flex items-center gap-2.5">
-            <button type="button" className="relative grid h-9 w-9 place-items-center rounded-fo border border-fo-border bg-fo-surface hover:bg-fo-surface-raised" aria-label="Notificações">
+            <NavLink
+              to="/notificacoes"
+              className="relative grid h-9 w-9 place-items-center rounded-fo border border-fo-border bg-fo-surface hover:bg-fo-surface-raised"
+              aria-label="Notificações"
+            >
               <Bell size={16} />
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-fo-surface bg-fo-danger" />
-            </button>
+              {unread > 0 && (
+                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-fo-surface bg-fo-danger" />
+              )}
+            </NavLink>
             <div className="flex items-center gap-2.5 rounded-fo px-1 py-1">
               <div className="grid h-8 w-8 place-items-center rounded-fo bg-fo-brand-subtle text-[12px] font-bold text-fo-brand">
                 {user ? initials(user.full_name) : "?"}

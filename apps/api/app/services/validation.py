@@ -9,8 +9,9 @@ from decimal import Decimal, ROUND_HALF_UP
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
-from app.domain.enums import HourConcept, ShiftStatus, TimeEntryStatus
-from app.models import Assignment, Organization, Shift, TimeEntry, TimeStateHistory
+from app.domain.enums import HourConcept, RoleCode, ShiftStatus, TimeEntryStatus
+from app.models import Assignment, Employee, Organization, Shift, TimeEntry, TimeStateHistory, User
+from app.services.audit import write_audit
 
 EUR2 = Decimal("0.01")
 
@@ -118,6 +119,38 @@ def submit_execution(
     return entry
 
 
+def supervisor_team_employee_ids(db: Session, user: User) -> set[uuid.UUID] | None:
+    """If user is SUPERVISOR (and not admin/gestor), return IDs of their team; else None = no scope limit."""
+    codes = {ur.role.code for ur in user.roles}
+    if RoleCode.ADMINISTRADOR in codes or RoleCode.GESTOR_OPERACIONAL in codes or RoleCode.DIRECAO in codes:
+        return None
+    if RoleCode.SUPERVISOR not in codes:
+        return None
+    if not user.employee_id:
+        # Supervisor user without employee link — empty team
+        return set()
+    team = list(
+        db.scalars(
+            select(Employee.id).where(
+                Employee.organization_id == user.organization_id,
+                Employee.supervisor_id == user.employee_id,
+            )
+        )
+    )
+    team_ids = set(team)
+    team_ids.add(user.employee_id)
+    return team_ids
+
+
+def assert_supervisor_can_validate(db: Session, user: User, shift: Shift) -> None:
+    scope = supervisor_team_employee_ids(db, user)
+    if scope is None:
+        return
+    active = next((a for a in shift.assignments if a.active), None)
+    if not active or active.employee_id not in scope:
+        raise ValidationError("Supervisor só pode validar a sua equipa")
+
+
 def validate_entry(
     db: Session,
     *,
@@ -128,6 +161,7 @@ def validate_entry(
     allow_extra_billable: bool = False,
     adjustment_note: str | None = None,
     author_user_id: uuid.UUID | None = None,
+    author_user: User | None = None,
     auto: bool = False,
 ) -> TimeEntry:
     shift = (
@@ -141,10 +175,22 @@ def validate_entry(
     if not shift:
         raise ValidationError("Turno não encontrado")
 
+    if author_user and not auto:
+        assert_supervisor_can_validate(db, author_user, shift)
+
     if action == "REJEITAR":
         entry.status = TimeEntryStatus.REJEITADO
         entry.adjustment_note = adjustment_note
         shift.status = ShiftStatus.REJEITADO
+        write_audit(
+            db,
+            organization_id=organization_id,
+            actor_user_id=author_user_id,
+            action="HOURS_REJECT",
+            entity_type="time_entry",
+            entity_id=entry.id,
+            after={"status": entry.status},
+        )
         db.commit()
         db.refresh(entry)
         return entry
@@ -193,6 +239,20 @@ def validate_entry(
             author_user_id=author_user_id,
         )
 
+    write_audit(
+        db,
+        organization_id=organization_id,
+        actor_user_id=author_user_id,
+        action="HOURS_APPROVE" if not auto else "HOURS_AUTO_APPROVE",
+        entity_type="time_entry",
+        entity_id=entry.id,
+        after={
+            "status": entry.status,
+            "hours_approved": str(approved),
+            "hours_billable": str(billable),
+            "allow_extra": allow_extra_billable,
+        },
+    )
     db.commit()
     db.refresh(entry)
     return entry

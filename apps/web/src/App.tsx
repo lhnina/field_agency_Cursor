@@ -13,6 +13,8 @@ import { SettingsPage } from "@/pages/SettingsPage";
 import { AbsencesPage } from "@/pages/AbsencesPage";
 import { HoursPage } from "@/pages/HoursPage";
 import { BillingPage } from "@/pages/BillingPage";
+import { BudgetsPage } from "@/pages/BudgetsPage";
+import { NotificationsPage } from "@/pages/NotificationsPage";
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { token, loading } = useAuth();
@@ -47,7 +49,9 @@ export function App() {
         <Route path="contratos" element={<ContractsPage />} />
         <Route path="clientes" element={<ClientsPage />} />
         <Route path="lojas" element={<StoresPage />} />
+        <Route path="orcamentos" element={<BudgetsPage />} />
         <Route path="faturacao" element={<BillingPage />} />
+        <Route path="notificacoes" element={<NotificationsPage />} />
         <Route path="rentabilidade" element={<ProfitabilityPage />} />
         <Route path="definicoes" element={<SettingsPage />} />
       </Route>

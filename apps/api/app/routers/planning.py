@@ -32,6 +32,7 @@ from app.services.assignments import (
     set_stable_plan_assignee,
     substitute_on_shift,
 )
+from app.services.docs_gate import DocsSoftBlockError
 from app.services.shifts import generate_shifts_for_week, planning_week
 
 router = APIRouter(tags=["planeamento"])
@@ -192,6 +193,15 @@ def assign_shift(
                 "conflicting_shift_ids": [str(i) for i in exc.conflicting_shift_ids],
             },
         ) from exc
+    except DocsSoftBlockError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": str(exc),
+                "doc_ids": [str(i) for i in exc.doc_ids],
+                "code": "DOCS_SOFT_BLOCK",
+            },
+        ) from exc
     except AssignmentError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     shift = _get_shift(db, user.organization_id, shift_id)
@@ -223,6 +233,15 @@ def substitute_shift(
             detail={
                 "message": str(exc),
                 "conflicting_shift_ids": [str(i) for i in exc.conflicting_shift_ids],
+            },
+        ) from exc
+    except DocsSoftBlockError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": str(exc),
+                "doc_ids": [str(i) for i in exc.doc_ids],
+                "code": "DOCS_SOFT_BLOCK",
             },
         ) from exc
     except AssignmentError as exc:

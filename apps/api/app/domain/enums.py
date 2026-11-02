@@ -133,3 +133,25 @@ class ServiceArea(StrEnum):
     PROMOCAO = "PROMOCAO"
     LOGISTICA = "LOGISTICA"
     EQUIPAS_FIXAS = "EQUIPAS_FIXAS"
+
+
+class BudgetStatus(StrEnum):
+    RASCUNHO = "RASCUNHO"
+    ENVIADO = "ENVIADO"
+    APROVADO = "APROVADO"
+    REJEITADO = "REJEITADO"
+    CONVERTIDO = "CONVERTIDO"
+
+
+class NotificationKind(StrEnum):
+    SUBSTITUICAO = "SUBSTITUICAO"
+    AUSENCIA = "AUSENCIA"
+    EXPORT = "EXPORT"
+    SISTEMA = "SISTEMA"
+    DOC_ALERTA = "DOC_ALERTA"
+
+
+class EmailOutboxStatus(StrEnum):
+    PENDING = "PENDING"
+    SENT_STUB = "SENT_STUB"
+    ERROR = "ERROR"

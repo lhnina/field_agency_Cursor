@@ -403,6 +403,9 @@ class BillingPeriod(Base):
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="ABERTO")
+    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    closed_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
+    reopen_reason: Mapped[Optional[str]] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     drafts: Mapped[list[BillingDraft]] = relationship(back_populates="period", cascade="all, delete-orphan")
@@ -482,6 +485,9 @@ class PayrollPeriod(Base):
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="ABERTO")
+    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    closed_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
+    reopen_reason: Mapped[Optional[str]] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     statements: Mapped[list[PayrollStatement]] = relationship(back_populates="period", cascade="all, delete-orphan")
@@ -522,6 +528,111 @@ class ErpExportBatch(Base):
     row_count: Mapped[int] = mapped_column(Integer, default=0)
     period_label: Mapped[Optional[str]] = mapped_column(String(64))
     error_message: Mapped[Optional[str]] = mapped_column(String(255))
+    retry_count: Mapped[int] = mapped_column(Integer, default=0)
+    ack_reference: Mapped[Optional[str]] = mapped_column(String(120))
     created_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    acked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class Zone(Base):
+    """Zone catalogue (Q05)."""
+
+    __tablename__ = "zones"
+    __table_args__ = (UniqueConstraint("organization_id", "code"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    code: Mapped[str] = mapped_column(String(64), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class Budget(Base):
+    """Commercial budget/quote — approved generates Contract + Campaign (Q02)."""
+
+    __tablename__ = "budgets"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    client_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("clients.id"), nullable=False, index=True)
+    brand_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("brands.id"))
+    number: Mapped[str] = mapped_column(String(64), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    contract_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="RASCUNHO")
+    valid_until: Mapped[Optional[date]] = mapped_column(Date)
+    lines: Mapped[dict] = mapped_column(JsonType, default=list)
+    total_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    resulting_contract_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("contracts.id"))
+    resulting_campaign_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    client: Mapped[Client] = relationship()
+
+
+class Campaign(Base):
+    __tablename__ = "campaigns"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    client_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("clients.id"), nullable=False)
+    brand_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("brands.id"))
+    contract_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("contracts.id"))
+    budget_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("budgets.id"))
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    start_date: Mapped[Optional[date]] = mapped_column(Date)
+    end_date: Mapped[Optional[date]] = mapped_column(Date)
+    status: Mapped[str] = mapped_column(String(32), default="ATIVA")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AuditLog(Base):
+    """Append-only critical action log (MVP-26)."""
+
+    __tablename__ = "audit_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    actor_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
+    action: Mapped[str] = mapped_column(String(80), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    entity_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    before: Mapped[Optional[dict]] = mapped_column(JsonType)
+    after: Mapped[Optional[dict]] = mapped_column(JsonType)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Notification(Base):
+    """Persisted in-app notifications (Q31)."""
+
+    __tablename__ = "notifications"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str] = mapped_column(String(500), nullable=False)
+    read: Mapped[bool] = mapped_column(Boolean, default=False)
+    entity_type: Mapped[Optional[str]] = mapped_column(String(64))
+    entity_id: Mapped[Optional[str]] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class EmailOutbox(Base):
+    """Email stub outbox — no real SMTP in MVP (Q31)."""
+
+    __tablename__ = "email_outbox"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    to_address: Mapped[str] = mapped_column(String(255), nullable=False)
+    subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="PENDING")
+    related_kind: Mapped[Optional[str]] = mapped_column(String(32))
+    related_id: Mapped[Optional[str]] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
