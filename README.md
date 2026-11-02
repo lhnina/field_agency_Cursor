@@ -8,15 +8,15 @@ Monólito modular: React + TypeScript + Tailwind (web) · FastAPI + PostgreSQL (
 
 - **PR1** — foundation (scaffold, auth/RBAC, cadastro, contratos, planeamento shell, 7 horas, seed)
 - **PR2** — planning ops (afetação estável, overlap, ausências, substituições, alertas docs, CI)
+- **PR3** — billing / PHC (validação horas, pré-faturação, apuramento, export CSV, margem)
 
-### PR2 (planning ops)
+### PR3 (billing / PHC)
 
-- Afetação estável no plano + UI lista/atribuir (Q04 / Q30)
-- Overlap hard-block na afetação + alertas de serviços sem recurso
-- Ausências (pedido + aprovação) com bloqueio visual no calendário
-- Substituições com histórico previsto vs executado
-- Alertas de documentos a expirar / expirados
-- CI GitHub Actions (pytest API + build web)
+- Validação horas + auto 3 dias úteis (Q12) + cutoff tácito 18h (Q23 stub)
+- Períodos mensais por área (Q15) · pré-fatura Q10/Q11
+- Apuramento Cliente/Horas/Valor (Q13) · RV preço/hora (Q14)
+- Export PHC CSV c/ IVA/artigos/CC (Q16–Q18) · custos + margem
+- Dashboard KPIs alargados
 
 ## Pré-requisitos
 
