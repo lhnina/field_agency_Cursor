@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --fo-brand: #0c6e5c;
+  --fo-brand-hover: #095a4b;
+  --fo-brand-pressed: #074a3d;
+  --fo-brand-subtle: #e6f3ef;
+  --fo-brand-muted: #9bc5b8;
+  --fo-accent: #e08a2b;
+  --fo-accent-hover: #c9741a;
+  --fo-accent-subtle: #fdf3e6;
+  --fo-ink: #15202b;
+  --fo-ink-secondary: #4a5b6c;
+  --fo-ink-muted: #7a8b9a;
+  --fo-canvas: #eef1f4;
+  --fo-surface: #ffffff;
+  --fo-surface-raised: #f7f9fa;
+  --fo-border: #d5dce3;
+  --fo-border-strong: #b8c2cc;
+  --fo-sidebar-bg: #f7f9fa;
+  --fo-sidebar-border: #e2e8ee;
+  --fo-success: #1f7a4d;
+  --fo-success-subtle: #e5f5ec;
+  --fo-warning: #c27803;
+  --fo-warning-subtle: #fdf4e3;
+  --fo-danger: #c23b3b;
+  --fo-danger-subtle: #fbeaea;
+  --fo-info: #2b6cb0;
+  --fo-info-subtle: #e8f1fa;
+  --fo-svc-reposicao: #0c6e5c;
+  --fo-svc-promocao: #2b6cb0;
+  --fo-svc-logistica: #6b5b95;
+  --fo-svc-equipas: #8a6d3b;
+  --fo-svc-unassigned: #e08a2b;
+  --fo-font-sans: "Plus Jakarta Sans", system-ui, sans-serif;
+  --fo-font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --fo-sidebar-w: 240px;
+  --fo-header-h: 56px;
+  --fo-radius-sm: 6px;
+  --fo-radius-md: 8px;
+  --fo-radius-lg: 10px;
+  --fo-shadow-sm: 0 1px 2px rgba(21, 32, 43, 0.05);
+  --fo-shadow-md: 0 4px 12px rgba(21, 32, 43, 0.08);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    @apply bg-fo-canvas text-fo-ink font-sans antialiased;
+  }
+
+  button,
+  input,
+  select {
+    font: inherit;
+  }
+}
+
+@layer components {
+  .fo-btn {
+    @apply inline-flex h-btn items-center justify-center gap-2 rounded-fo px-3.5 text-[13.5px] font-semibold transition-colors duration-fo;
+  }
+  .fo-btn-primary {
+    @apply fo-btn bg-fo-brand text-white hover:bg-fo-brand-hover active:bg-fo-brand-pressed;
+  }
+  .fo-btn-secondary {
+    @apply fo-btn border border-fo-border bg-fo-surface text-fo-ink hover:bg-fo-surface-raised;
+  }
+  .fo-btn-accent {
+    @apply fo-btn bg-fo-accent text-white hover:bg-fo-accent-hover;
+  }
+  .fo-btn-ghost {
+    @apply fo-btn text-fo-ink-secondary hover:bg-fo-surface-raised hover:text-fo-ink;
+  }
+  .fo-badge {
+    @apply inline-flex h-[22px] items-center rounded-fo-sm px-2 text-[11px] font-bold uppercase tracking-[0.03em];
+  }
+  .fo-field {
+    @apply flex h-[34px] items-center gap-2 rounded-fo border border-fo-border bg-fo-surface px-2.5 text-[13px];
+  }
+  .fo-panel {
+    @apply rounded-fo-lg border border-fo-border bg-fo-surface shadow-fo-sm;
+  }
+  .fo-slot {
+    @apply rounded-fo-sm border px-2 py-1.5 text-[12px] font-medium leading-snug cursor-pointer transition-shadow duration-fo hover:shadow-fo-md;
+  }
+  .fo-slot-rep {
+    @apply fo-slot border-fo-brand/30 bg-fo-brand-subtle text-fo-brand;
+  }
+  .fo-slot-prom {
+    @apply fo-slot border-fo-info/30 bg-fo-info-subtle text-fo-info;
+  }
+  .fo-slot-log {
+    @apply fo-slot border-[#6B5B95]/30 bg-[#efeaf8] text-fo-logistica;
+  }
+  .fo-slot-eq {
+    @apply fo-slot border-fo-equipas/30 bg-[#f5efe6] text-fo-equipas;
+  }
+  .fo-slot-empty {
+    @apply fo-slot border-fo-accent/40 bg-fo-accent-subtle text-fo-accent-hover border-dashed;
+  }
+}
