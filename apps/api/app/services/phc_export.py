@@ -114,29 +114,32 @@ def create_payroll_export_batch(
     organization_id: uuid.UUID,
     period_id: uuid.UUID,
     author_user_id: uuid.UUID | None = None,
+    engagement_type: str | None = None,
 ) -> ErpExportBatch:
     period = db.get(PayrollPeriod, period_id)
     if not period or period.organization_id != organization_id:
         raise ValueError("Período de apuramento não encontrado")
-    statements = list(
-        db.scalars(
-            select(PayrollStatement)
-            .options(joinedload(PayrollStatement.employee))
-            .where(PayrollStatement.period_id == period_id)
-        ).unique()
+    q = (
+        select(PayrollStatement)
+        .options(joinedload(PayrollStatement.employee))
+        .where(PayrollStatement.period_id == period_id)
     )
+    if engagement_type:
+        q = q.where(PayrollStatement.engagement_type == engagement_type)
+    statements = list(db.scalars(q).unique())
     if not statements:
         raise ValueError("Sem linhas de apuramento")
 
+    suffix = f"_{engagement_type}" if engagement_type else ""
     content = payroll_csv(statements)
     batch = ErpExportBatch(
         organization_id=organization_id,
         batch_type=ExportBatchType.REMUNERACAO,
         status=ExportBatchStatus.PENDING,
-        filename=f"phc_remuneracao_{period.year}_{period.month:02d}.csv",
+        filename=f"phc_remuneracao_{period.year}_{period.month:02d}{suffix}.csv",
         content=content,
         row_count=len(statements),
-        period_label=f"{period.year}-{period.month:02d}",
+        period_label=f"{period.year}-{period.month:02d}{suffix}",
         created_by_user_id=author_user_id,
     )
     db.add(batch)
@@ -148,6 +151,48 @@ def create_payroll_export_batch(
 def mark_batch_sent(db: Session, batch: ErpExportBatch) -> ErpExportBatch:
     batch.status = ExportBatchStatus.SENT
     batch.sent_at = datetime.now(timezone.utc)
+    batch.error_message = None
+    db.commit()
+    db.refresh(batch)
+    return batch
+
+
+def mark_batch_acked(
+    db: Session,
+    batch: ErpExportBatch,
+    *,
+    ack_reference: str | None = None,
+) -> ErpExportBatch:
+    batch.status = ExportBatchStatus.ACKED
+    batch.acked_at = datetime.now(timezone.utc)
+    batch.ack_reference = ack_reference
+    batch.error_message = None
+    db.commit()
+    db.refresh(batch)
+    return batch
+
+
+def mark_batch_error(
+    db: Session,
+    batch: ErpExportBatch,
+    *,
+    error_message: str,
+) -> ErpExportBatch:
+    batch.status = ExportBatchStatus.ERROR
+    batch.error_message = error_message[:255]
+    db.commit()
+    db.refresh(batch)
+    return batch
+
+
+def retry_batch(db: Session, batch: ErpExportBatch) -> ErpExportBatch:
+    """Reset ERROR/PENDING to SENT for retry (re-queue stub)."""
+    if batch.status not in {ExportBatchStatus.ERROR, ExportBatchStatus.PENDING, ExportBatchStatus.SENT}:
+        raise ValueError("Só batches PENDING/SENT/ERROR podem ser retentados")
+    batch.retry_count = (batch.retry_count or 0) + 1
+    batch.status = ExportBatchStatus.SENT
+    batch.sent_at = datetime.now(timezone.utc)
+    batch.error_message = None
     db.commit()
     db.refresh(batch)
     return batch

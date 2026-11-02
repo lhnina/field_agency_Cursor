@@ -19,7 +19,11 @@ from app.models import (
     Substitution,
     TimeEntry,
     TimeStateHistory,
+    User,
 )
+from app.services.docs_gate import DocsSoftBlockError, expired_docs_for_employee, org_soft_block_docs
+from app.services.notifications import notify_substitution
+from app.services.audit import write_audit
 
 
 class OverlapError(Exception):
@@ -132,6 +136,16 @@ def assign_employee_to_shift(
             f"Colaborador em ausência aprovada ({absence.absence_type}) em {day.isoformat()}"
         )
 
+    if org_soft_block_docs(db, organization_id):
+        expired = expired_docs_for_employee(
+            db, organization_id=organization_id, employee_id=employee_id, on_day=day
+        )
+        if expired:
+            raise DocsSoftBlockError(
+                "Documentos expirados — soft-block ativo (REC-07)",
+                [d.id for d in expired],
+            )
+
     overlaps = find_overlapping_shifts(
         db,
         organization_id=organization_id,
@@ -175,6 +189,15 @@ def assign_employee_to_shift(
         assigned=True,
         author_user_id=author_user_id,
     )
+    write_audit(
+        db,
+        organization_id=organization_id,
+        actor_user_id=author_user_id,
+        action="SHIFT_ASSIGN",
+        entity_type="shift",
+        entity_id=shift.id,
+        after={"employee_id": str(employee_id), "assignment_id": str(assignment.id)},
+    )
     db.commit()
     db.refresh(assignment)
     return assignment
@@ -210,6 +233,16 @@ def substitute_on_shift(
     )
     if absence:
         raise AssignmentError("Substituto em ausência aprovada neste dia")
+
+    if org_soft_block_docs(db, organization_id):
+        expired = expired_docs_for_employee(
+            db, organization_id=organization_id, employee_id=substitute_employee_id, on_day=day
+        )
+        if expired:
+            raise DocsSoftBlockError(
+                "Substituto com documentos expirados — soft-block ativo (REC-07)",
+                [d.id for d in expired],
+            )
 
     overlaps = find_overlapping_shifts(
         db,
@@ -257,6 +290,38 @@ def substitute_on_shift(
         shift=shift,
         assigned=True,
         author_user_id=author_user_id,
+    )
+    db.flush()
+
+    planned_emp = db.get(Employee, planned_employee_id)
+    exec_emp = db.get(Employee, substitute_employee_id)
+    store_name = shift.store.name if shift.store else "loja"
+    # Notify planned collaborator user if linked; always queue email stub when email known
+    to_user = None
+    if planned_emp and planned_emp.email:
+        to_user = db.scalar(select(User).where(User.email == planned_emp.email))
+    notify_substitution(
+        db,
+        organization_id=organization_id,
+        to_email=planned_emp.email if planned_emp else None,
+        to_user_id=to_user.id if to_user else author_user_id,
+        planned_name=planned_emp.full_name if planned_emp else str(planned_employee_id),
+        executed_name=exec_emp.full_name if exec_emp else str(substitute_employee_id),
+        store_name=store_name,
+        substitution_id=sub.id,
+    )
+    write_audit(
+        db,
+        organization_id=organization_id,
+        actor_user_id=author_user_id,
+        action="SHIFT_SUBSTITUTE",
+        entity_type="substitution",
+        entity_id=sub.id,
+        after={
+            "planned": str(planned_employee_id),
+            "executed": str(substitute_employee_id),
+            "shift_id": str(shift.id),
+        },
     )
     db.commit()
     db.refresh(sub)

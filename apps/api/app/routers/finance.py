@@ -36,6 +36,8 @@ from app.schemas.common import (
     CostEntryOut,
     DashboardKpisOut,
     ErpExportBatchOut,
+    ExportAckIn,
+    ExportErrorIn,
     ExtraOverrideIn,
     MarginOut,
     PayrollPeriodOut,
@@ -53,11 +55,14 @@ from app.services.billing import (
     ensure_month_periods,
     generate_prebilling,
 )
-from app.services.payroll import ensure_payroll_period, generate_payroll_statements
+from app.services.payroll import ensure_payroll_period, filter_statements, generate_payroll_statements
 from app.services.phc_export import (
     create_billing_export_batch,
     create_payroll_export_batch,
+    mark_batch_acked,
+    mark_batch_error,
     mark_batch_sent,
+    retry_batch,
 )
 from app.services.validation import ValidationError, run_auto_approve, submit_execution, validate_entry
 
@@ -172,6 +177,7 @@ def validate_hours(
             allow_extra_billable=payload.allow_extra_billable,
             adjustment_note=payload.adjustment_note,
             author_user_id=user.id,
+            author_user=user,
         )
     except ValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -362,7 +368,10 @@ def generate_payroll(
     )
     if not period:
         raise HTTPException(status_code=404, detail="Período não encontrado")
-    stmts = generate_payroll_statements(db, organization_id=user.organization_id, period=period)
+    try:
+        generate_payroll_statements(db, organization_id=user.organization_id, period=period)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return [
         PayrollStatementOut(
             id=s.id,
@@ -386,6 +395,7 @@ def generate_payroll(
 @router.get("/payroll-periods/{period_id}/statements", response_model=list[PayrollStatementOut])
 def list_statements(
     period_id: uuid.UUID,
+    engagement_type: str | None = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[PayrollStatementOut]:
@@ -399,6 +409,7 @@ def list_statements(
             )
         ).unique()
     )
+    rows = filter_statements(rows, engagement_type=engagement_type)
     return [
         PayrollStatementOut(
             id=s.id,
@@ -433,12 +444,17 @@ def export_billing(
 @router.post("/exports/payroll/{period_id}", response_model=ErpExportBatchOut)
 def export_payroll(
     period_id: uuid.UUID,
+    engagement_type: str | None = Query(None),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ErpExportBatchOut:
     try:
         batch = create_payroll_export_batch(
-            db, organization_id=user.organization_id, period_id=period_id, author_user_id=user.id
+            db,
+            organization_id=user.organization_id,
+            period_id=period_id,
+            author_user_id=user.id,
+            engagement_type=engagement_type,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -483,14 +499,43 @@ def export_mark_sent(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ErpExportBatchOut:
-    batch = db.scalar(
-        select(ErpExportBatch).where(
-            ErpExportBatch.id == batch_id, ErpExportBatch.organization_id == user.organization_id
-        )
-    )
-    if not batch:
-        raise HTTPException(status_code=404, detail="Export não encontrado")
+    batch = _get_batch(db, user.organization_id, batch_id)
     return _batch_out(mark_batch_sent(db, batch))
+
+
+@router.post("/exports/{batch_id}/ack", response_model=ErpExportBatchOut)
+def export_ack(
+    batch_id: uuid.UUID,
+    payload: ExportAckIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ErpExportBatchOut:
+    batch = _get_batch(db, user.organization_id, batch_id)
+    return _batch_out(mark_batch_acked(db, batch, ack_reference=payload.ack_reference))
+
+
+@router.post("/exports/{batch_id}/error", response_model=ErpExportBatchOut)
+def export_error(
+    batch_id: uuid.UUID,
+    payload: ExportErrorIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ErpExportBatchOut:
+    batch = _get_batch(db, user.organization_id, batch_id)
+    return _batch_out(mark_batch_error(db, batch, error_message=payload.error_message))
+
+
+@router.post("/exports/{batch_id}/retry", response_model=ErpExportBatchOut)
+def export_retry(
+    batch_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ErpExportBatchOut:
+    batch = _get_batch(db, user.organization_id, batch_id)
+    try:
+        return _batch_out(retry_batch(db, batch))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/dashboard/kpis", response_model=DashboardKpisOut)
@@ -561,6 +606,17 @@ def _get_entry(db: Session, organization_id: uuid.UUID, entry_id: uuid.UUID) -> 
     return entry
 
 
+def _get_batch(db: Session, organization_id: uuid.UUID, batch_id: uuid.UUID) -> ErpExportBatch:
+    batch = db.scalar(
+        select(ErpExportBatch).where(
+            ErpExportBatch.id == batch_id, ErpExportBatch.organization_id == organization_id
+        )
+    )
+    if not batch:
+        raise HTTPException(status_code=404, detail="Export não encontrado")
+    return batch
+
+
 def _batch_out(batch: ErpExportBatch) -> ErpExportBatchOut:
     preview = "\n".join(batch.content.splitlines()[:6])
     return ErpExportBatchOut(
@@ -571,7 +627,10 @@ def _batch_out(batch: ErpExportBatch) -> ErpExportBatchOut:
         row_count=batch.row_count,
         period_label=batch.period_label,
         error_message=batch.error_message,
+        retry_count=batch.retry_count or 0,
+        ack_reference=batch.ack_reference,
         created_at=batch.created_at,
         sent_at=batch.sent_at,
+        acked_at=batch.acked_at,
         content_preview=preview,
     )

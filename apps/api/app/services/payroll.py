@@ -63,7 +63,11 @@ def generate_payroll_statements(
     period: PayrollPeriod,
 ) -> list[PayrollStatement]:
     """Aggregate approved payable hours per employee × client → Cliente, Horas, Valor."""
+    from app.domain.enums import PeriodStatus
     from app.services.billing import datetime_end_exclusive, datetime_start
+
+    if period.status == PeriodStatus.FECHADO:
+        raise ValueError("Período de apuramento fechado")
 
     # wipe previous statements for regen
     for old in list(db.scalars(select(PayrollStatement).where(PayrollStatement.period_id == period.id))):
@@ -157,6 +161,16 @@ def generate_payroll_statements(
         statements.append(st)
     db.commit()
     return statements
+
+
+def filter_statements(
+    statements: list[PayrollStatement],
+    *,
+    engagement_type: str | None = None,
+) -> list[PayrollStatement]:
+    if not engagement_type:
+        return list(statements)
+    return [s for s in statements if s.engagement_type == engagement_type]
 
 
 def payroll_csv(statements: list[PayrollStatement]) -> str:

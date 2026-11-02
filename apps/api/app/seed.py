@@ -9,10 +9,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.security import hash_password
-from app.domain.enums import AbsenceStatus, AbsenceType, ContractType, DocumentStatus, RoleCode
+from app.domain.enums import AbsenceStatus, AbsenceType, BudgetStatus, ContractType, DocumentStatus, RoleCode
 from app.models import (
     Absence,
     Brand,
+    Budget,
     Client,
     Contract,
     ContractLine,
@@ -32,6 +33,7 @@ from app.models import (
     User,
     UserRole,
 )
+from app.services.stores_import import ensure_zone
 from app.services.billing import (
     billing_model_for,
     ensure_month_periods,
@@ -83,6 +85,7 @@ def seed_all(db: Session) -> Organization:
             "tacit_acceptance_cutoff_hour": 18,  # Q23
             "vat_rate": "23.00",  # Q17
             "locale": "pt-PT",
+            "soft_block_docs_on_assign": False,  # REC-07 — toggle on in Definições
         },
     )
     db.add(org)
@@ -188,6 +191,7 @@ def seed_all(db: Session) -> Organization:
     db.add(UserRole(user_id=gestor.id, role_id=role_by_code[RoleCode.GESTOR_OPERACIONAL].id))
 
     # Seed users for remaining profiles (loginable stubs)
+    # Supervisor linked to Ana so validation scope covers Carla/Diogo (own team)
     for code, email, name in [
         (RoleCode.DIRECAO, "direcao@fieldops.pt", "Rita Direção"),
         (RoleCode.SUPERVISOR, "supervisor@fieldops.pt", "Paulo Supervisor"),
@@ -195,13 +199,18 @@ def seed_all(db: Session) -> Organization:
         (RoleCode.FINANCEIRO, "fin@fieldops.pt", "Tiago Financeiro"),
         (RoleCode.COLABORADOR, "ana.sousa@demo.fieldops.pt", "Ana Sousa"),
     ]:
+        linked = None
+        if code == RoleCode.COLABORADOR:
+            linked = ana.id
+        elif code == RoleCode.SUPERVISOR:
+            linked = ana.id
         u = User(
             organization_id=org.id,
             email=email,
             full_name=name,
             hashed_password=demo_password,
             is_active=True,
-            employee_id=ana.id if code == RoleCode.COLABORADOR else None,
+            employee_id=linked,
         )
         db.add(u)
         db.flush()
@@ -225,6 +234,14 @@ def seed_all(db: Session) -> Organization:
     auchan = RetailChain(organization_id=org.id, name="Auchan", insignia="Auchan")
     db.add_all([continente, pingo, auchan])
     db.flush()
+
+    # Zone catalogue (Q05)
+    for code, name in [
+        ("AML Norte", "Área Metropolitana de Lisboa · Norte"),
+        ("AML Sul", "Área Metropolitana de Lisboa · Sul"),
+        ("Grande Porto", "Grande Porto"),
+    ]:
+        ensure_zone(db, organization_id=org.id, code=code, name=name)
 
     stores = [
         Store(
@@ -645,5 +662,31 @@ def seed_all(db: Session) -> Organization:
         generate_prebilling(db, organization_id=org.id, period=period)
     payroll = ensure_payroll_period(db, organization_id=org.id, year=2026, month=11)
     generate_payroll_statements(db, organization_id=org.id, period=payroll)
+
+    # Sample budget ready to convert (Q02)
+    store_amadora = db.scalar(
+        select(Store).where(Store.organization_id == org.id, Store.name == "Continente Amadora")
+    )
+    db.add(
+        Budget(
+            organization_id=org.id,
+            client_id=client_x.id,
+            brand_id=brand_abc.id,
+            number="ORC-2026-001",
+            title="Campanha reposição Natal Amadora",
+            contract_type=ContractType.REPOSICAO,
+            status=BudgetStatus.APROVADO,
+            valid_until=date(2026, 12, 31),
+            lines=[
+                {
+                    "store_id": str(store_amadora.id) if store_amadora else None,
+                    "hours": "160",
+                    "bill_rate": "18.50",
+                }
+            ],
+            total_amount=Decimal("2960.00"),
+        )
+    )
+    db.commit()
 
     return org

@@ -378,12 +378,18 @@ class BillingPeriodOut(ORMModel):
     start_date: date
     end_date: date
     status: str
+    closed_at: Optional[datetime] = None
+    reopen_reason: Optional[str] = None
 
 
 class BillingPeriodCreate(BaseModel):
     year: int
     month: int
     service_area: Optional[str] = None  # if None, create all areas
+
+
+class PeriodReopenIn(BaseModel):
+    reason: str
 
 
 class BillingDraftLineOut(ORMModel):
@@ -461,6 +467,8 @@ class PayrollPeriodOut(ORMModel):
     start_date: date
     end_date: date
     status: str
+    closed_at: Optional[datetime] = None
+    reopen_reason: Optional[str] = None
 
 
 class PayrollStatementOut(ORMModel):
@@ -483,9 +491,20 @@ class ErpExportBatchOut(ORMModel):
     row_count: int
     period_label: Optional[str]
     error_message: Optional[str]
+    retry_count: int = 0
+    ack_reference: Optional[str] = None
     created_at: datetime
     sent_at: Optional[datetime]
+    acked_at: Optional[datetime] = None
     content_preview: Optional[str] = None
+
+
+class ExportAckIn(BaseModel):
+    ack_reference: Optional[str] = None
+
+
+class ExportErrorIn(BaseModel):
+    error_message: str
 
 
 class DashboardKpisOut(BaseModel):
@@ -498,4 +517,95 @@ class DashboardKpisOut(BaseModel):
     expected_margin_total: Decimal
     export_batches: int
     alerts: int
+
+
+class ZoneCreate(BaseModel):
+    code: str
+    name: Optional[str] = None
+    active: bool = True
+
+
+class ZoneOut(ORMModel):
+    id: uuid.UUID
+    organization_id: uuid.UUID
+    code: str
+    name: str
+    active: bool
+
+
+class BudgetCreate(BaseModel):
+    client_id: uuid.UUID
+    brand_id: Optional[uuid.UUID] = None
+    number: str
+    title: str
+    contract_type: str
+    valid_until: Optional[date] = None
+    lines: list[dict] = Field(default_factory=list)
+    total_amount: Decimal = Decimal("0")
+
+
+class BudgetOut(ORMModel):
+    id: uuid.UUID
+    organization_id: uuid.UUID
+    client_id: uuid.UUID
+    client_name: Optional[str] = None
+    brand_id: Optional[uuid.UUID]
+    number: str
+    title: str
+    contract_type: str
+    status: str
+    valid_until: Optional[date]
+    lines: list = Field(default_factory=list)
+    total_amount: Decimal
+    resulting_contract_id: Optional[uuid.UUID]
+    resulting_campaign_id: Optional[uuid.UUID]
+    created_at: datetime
+
+
+class CampaignOut(ORMModel):
+    id: uuid.UUID
+    organization_id: uuid.UUID
+    client_id: uuid.UUID
+    brand_id: Optional[uuid.UUID]
+    contract_id: Optional[uuid.UUID]
+    budget_id: Optional[uuid.UUID]
+    name: str
+    start_date: Optional[date]
+    end_date: Optional[date]
+    status: str
+    created_at: datetime
+
+
+class NotificationOut(ORMModel):
+    id: uuid.UUID
+    kind: str
+    title: str
+    body: str
+    read: bool
+    entity_type: Optional[str]
+    entity_id: Optional[str]
+    created_at: datetime
+
+
+class EmailOutboxOut(ORMModel):
+    id: uuid.UUID
+    to_address: str
+    subject: str
+    body: str
+    status: str
+    related_kind: Optional[str]
+    related_id: Optional[str]
+    created_at: datetime
+    sent_at: Optional[datetime]
+
+
+class AuditLogOut(ORMModel):
+    id: uuid.UUID
+    actor_user_id: Optional[uuid.UUID]
+    action: str
+    entity_type: str
+    entity_id: str
+    before: Optional[dict]
+    after: Optional[dict]
+    created_at: datetime
 
