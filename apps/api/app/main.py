@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.db import Base, SessionLocal, engine
-from app.routers import auth, cadastro, contracts, meta, planning, workforce
+from app.routers import auth, cadastro, contracts, finance, meta, planning, workforce
 from app.seed import seed_if_empty
 
 
@@ -27,8 +27,8 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
         title=settings.app_name,
-        version="0.2.0",
-        description="FieldOps — Field Operations SaaS MVP (PR2 planning ops)",
+        version="0.3.0",
+        description="FieldOps — Field Operations SaaS MVP (PR3 billing / PHC)",
         lifespan=lifespan,
     )
     app.add_middleware(
@@ -45,6 +45,7 @@ def create_app() -> FastAPI:
     app.include_router(contracts.router, prefix=prefix)
     app.include_router(planning.router, prefix=prefix)
     app.include_router(workforce.router, prefix=prefix)
+    app.include_router(finance.router, prefix=prefix)
     app.include_router(meta.router, prefix=prefix)
 
     @app.get("/health")

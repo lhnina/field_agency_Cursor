@@ -151,6 +151,106 @@ export type TimeEntry = {
   hours_billable: string;
   hours_payable: string;
   status: string;
+  submitted_at?: string | null;
+  approved_at?: string | null;
+  auto_approved?: boolean;
+  allow_extra_billable?: boolean;
+  adjustment_note?: string | null;
+  tacit_accepted?: boolean;
+  store_name?: string | null;
+  shift_type?: string | null;
+  planned_start?: string | null;
+};
+
+export type BillingPeriod = {
+  id: string;
+  organization_id: string;
+  year: number;
+  month: number;
+  service_area: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+};
+
+export type BillingDraftLine = {
+  id: string;
+  contract_line_id?: string | null;
+  article_code: string;
+  description: string;
+  quantity: string;
+  unit_price: string;
+  line_net: string;
+  billing_model: string;
+  capped: boolean;
+  extra_override: boolean;
+  extra_reason?: string | null;
+  cost_center?: string | null;
+};
+
+export type BillingDraft = {
+  id: string;
+  period_id: string;
+  client_id: string;
+  client_name?: string | null;
+  contract_id?: string | null;
+  status: string;
+  currency: string;
+  total_net: string;
+  total_vat: string;
+  total_gross: string;
+  vat_rate: string;
+  cost_center?: string | null;
+  lines: BillingDraftLine[];
+};
+
+export type PayrollStatement = {
+  id: string;
+  employee_id: string;
+  employee_name?: string | null;
+  client_name: string;
+  hours: string;
+  amount: string;
+  engagement_type: string;
+  hourly_rate?: string | null;
+  currency: string;
+};
+
+export type ErpExportBatch = {
+  id: string;
+  batch_type: string;
+  status: string;
+  filename: string;
+  row_count: number;
+  period_label?: string | null;
+  error_message?: string | null;
+  created_at: string;
+  sent_at?: string | null;
+  content_preview?: string | null;
+};
+
+export type Margin = {
+  contract_id: string;
+  contract_number: string;
+  client_name?: string | null;
+  expected_revenue: string;
+  direct_costs: string;
+  expected_margin: string;
+  margin_pct: string;
+  currency: string;
+  cost_entries: number;
+};
+
+export type DashboardKpis = {
+  contracts: number;
+  employees: number;
+  shifts_week: number;
+  unassigned_week: number;
+  pending_validation: number;
+  approved_hours_month: string;
+  expected_margin_total: string;
+  export_batches: number;
+  alerts: number;
 };
 
 export type Organization = {

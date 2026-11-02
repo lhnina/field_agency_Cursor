@@ -17,6 +17,7 @@ from app.models import (
     Contract,
     ContractLine,
     ContractVersion,
+    CostEntry,
     Employee,
     EmployeeDocument,
     Organization,
@@ -25,12 +26,21 @@ from app.models import (
     Role,
     RolePermission,
     ServicePlan,
+    Shift,
     Store,
+    TimeEntry,
     User,
     UserRole,
 )
-from app.services.billing import billing_model_for, line_generates_daily_shifts
+from app.services.billing import (
+    billing_model_for,
+    ensure_month_periods,
+    generate_prebilling,
+    line_generates_daily_shifts,
+)
+from app.services.payroll import ensure_payroll_period, generate_payroll_statements
 from app.services.shifts import generate_shifts_for_week
+from app.services.validation import submit_execution, validate_entry
 
 ROLES = [
     (RoleCode.ADMINISTRADOR, "Administrador", "Acesso total"),
@@ -70,6 +80,8 @@ def seed_all(db: Session) -> Organization:
             "billing_cap": "contracted",  # Q11
             "auto_approve_business_days": 3,  # Q12
             "ct_mode": "alerts_only",  # Q20
+            "tacit_acceptance_cutoff_hour": 18,  # Q23
+            "vat_rate": "23.00",  # Q17
             "locale": "pt-PT",
         },
     )
@@ -118,6 +130,7 @@ def seed_all(db: Session) -> Organization:
         engagement_type="RV",
         zone_code="AML Sul",
         hourly_cost=Decimal("11.00"),
+        rv_hourly_rate=Decimal("12.50"),  # Q14
         email="bruno.martins@demo.fieldops.pt",
         status="ATIVO",
     )
@@ -557,5 +570,80 @@ def seed_all(db: Session) -> Organization:
             week_start=week_start,
             author_user_id=admin.id,
         )
+
+    # Direct costs for margin (MVP-27)
+    db.add_all(
+        [
+            CostEntry(
+                organization_id=org.id,
+                contract_id=c_rep.id,
+                cost_type="MAO_DE_OBRA",
+                amount=Decimal("420.00"),
+                period_year=2026,
+                period_month=11,
+                notes="Custo direto estimado reposição",
+            ),
+            CostEntry(
+                organization_id=org.id,
+                contract_id=c_prom.id,
+                cost_type="MATERIAIS",
+                amount=Decimal("85.00"),
+                period_year=2026,
+                period_month=11,
+            ),
+            CostEntry(
+                organization_id=org.id,
+                contract_id=c_eq.id,
+                cost_type="MAO_DE_OBRA",
+                amount=Decimal("1800.00"),
+                period_year=2026,
+                period_month=11,
+                notes="Equipas fixas",
+            ),
+        ]
+    )
+    db.commit()
+
+    # Submit + approve some executed hours for billing/payroll demos
+    assigned_entries = list(
+        db.scalars(
+            select(TimeEntry)
+            .join(Shift, Shift.id == TimeEntry.shift_id)
+            .where(TimeEntry.organization_id == org.id, TimeEntry.hours_assigned > 0)
+        )
+    )
+    for entry in assigned_entries[:6]:
+        submit_execution(
+            db,
+            organization_id=org.id,
+            entry=entry,
+            author_user_id=admin.id,
+            apply_tacit=True,
+        )
+        entry = db.get(TimeEntry, entry.id)
+        assert entry is not None
+        validate_entry(
+            db,
+            organization_id=org.id,
+            entry=entry,
+            action="APROVAR",
+            author_user_id=admin.id,
+        )
+    # Leave one submitted pending for validation UI / auto-approve demo
+    if len(assigned_entries) > 6:
+        submit_execution(
+            db,
+            organization_id=org.id,
+            entry=assigned_entries[6],
+            author_user_id=admin.id,
+            apply_tacit=True,
+        )
+
+    # Monthly periods Nov 2026 (Q15) + pre-billing + payroll map
+    periods = ensure_month_periods(db, organization_id=org.id, year=2026, month=11)
+    for period in periods:
+        generate_prebilling(db, organization_id=org.id, period=period)
+    payroll = ensure_payroll_period(db, organization_id=org.id, year=2026, month=11)
+    generate_payroll_statements(db, organization_id=org.id, period=payroll)
 
     return org

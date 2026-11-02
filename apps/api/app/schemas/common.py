@@ -249,6 +249,27 @@ class TimeEntryOut(ORMModel):
     hours_billable: Decimal
     hours_payable: Decimal
     status: str
+    submitted_at: Optional[datetime] = None
+    approved_at: Optional[datetime] = None
+    auto_approved: bool = False
+    allow_extra_billable: bool = False
+    adjustment_note: Optional[str] = None
+    tacit_accepted: bool = False
+    store_name: Optional[str] = None
+    shift_type: Optional[str] = None
+    planned_start: Optional[datetime] = None
+
+
+class SubmitHoursIn(BaseModel):
+    hours_executed: Optional[Decimal] = None
+    apply_tacit: bool = True
+
+
+class ValidateHoursIn(BaseModel):
+    action: str  # APROVAR | AJUSTAR | REJEITAR
+    hours_approved: Optional[Decimal] = None
+    allow_extra_billable: bool = False
+    adjustment_note: Optional[str] = None
 
 
 class PlanningWeekOut(BaseModel):
@@ -346,3 +367,135 @@ class AlertOut(BaseModel):
     message: str
     entity_type: str
     entity_id: str
+
+
+class BillingPeriodOut(ORMModel):
+    id: uuid.UUID
+    organization_id: uuid.UUID
+    year: int
+    month: int
+    service_area: str
+    start_date: date
+    end_date: date
+    status: str
+
+
+class BillingPeriodCreate(BaseModel):
+    year: int
+    month: int
+    service_area: Optional[str] = None  # if None, create all areas
+
+
+class BillingDraftLineOut(ORMModel):
+    id: uuid.UUID
+    contract_line_id: Optional[uuid.UUID]
+    article_code: str
+    description: str
+    quantity: Decimal
+    unit_price: Decimal
+    line_net: Decimal
+    billing_model: str
+    capped: bool
+    extra_override: bool
+    extra_reason: Optional[str]
+    cost_center: Optional[str]
+
+
+class BillingDraftOut(ORMModel):
+    id: uuid.UUID
+    period_id: uuid.UUID
+    client_id: uuid.UUID
+    client_name: Optional[str] = None
+    contract_id: Optional[uuid.UUID]
+    status: str
+    currency: str
+    total_net: Decimal
+    total_vat: Decimal
+    total_gross: Decimal
+    vat_rate: Decimal
+    cost_center: Optional[str]
+    lines: list[BillingDraftLineOut] = []
+
+
+class ExtraOverrideIn(BaseModel):
+    quantity: Decimal
+    reason: str
+
+
+class CostEntryCreate(BaseModel):
+    contract_id: uuid.UUID
+    contract_line_id: Optional[uuid.UUID] = None
+    cost_type: str
+    amount: Decimal
+    period_year: Optional[int] = None
+    period_month: Optional[int] = None
+    notes: Optional[str] = None
+
+
+class CostEntryOut(ORMModel):
+    id: uuid.UUID
+    contract_id: uuid.UUID
+    cost_type: str
+    amount: Decimal
+    period_year: Optional[int]
+    period_month: Optional[int]
+    notes: Optional[str]
+
+
+class MarginOut(BaseModel):
+    contract_id: str
+    contract_number: str
+    client_name: Optional[str]
+    expected_revenue: str
+    direct_costs: str
+    expected_margin: str
+    margin_pct: str
+    currency: str
+    cost_entries: int
+
+
+class PayrollPeriodOut(ORMModel):
+    id: uuid.UUID
+    year: int
+    month: int
+    start_date: date
+    end_date: date
+    status: str
+
+
+class PayrollStatementOut(ORMModel):
+    id: uuid.UUID
+    employee_id: uuid.UUID
+    employee_name: Optional[str] = None
+    client_name: str
+    hours: Decimal
+    amount: Decimal
+    engagement_type: str
+    hourly_rate: Optional[Decimal]
+    currency: str
+
+
+class ErpExportBatchOut(ORMModel):
+    id: uuid.UUID
+    batch_type: str
+    status: str
+    filename: str
+    row_count: int
+    period_label: Optional[str]
+    error_message: Optional[str]
+    created_at: datetime
+    sent_at: Optional[datetime]
+    content_preview: Optional[str] = None
+
+
+class DashboardKpisOut(BaseModel):
+    contracts: int
+    employees: int
+    shifts_week: int
+    unassigned_week: int
+    pending_validation: int
+    approved_hours_month: Decimal
+    expected_margin_total: Decimal
+    export_batches: int
+    alerts: int
+

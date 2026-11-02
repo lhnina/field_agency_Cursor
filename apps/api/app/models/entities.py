@@ -167,6 +167,8 @@ class Employee(Base):
     supervisor_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("employees.id"), nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="ATIVO")
     hourly_cost: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 2))
+    # Q14: recibos verdes — preço/hora (payable rate)
+    rv_hourly_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 2))
     email: Mapped[Optional[str]] = mapped_column(String(255))
     phone: Mapped[Optional[str]] = mapped_column(String(40))
     availability: Mapped[Optional[dict]] = mapped_column(JsonType, default=dict)
@@ -302,6 +304,12 @@ class TimeEntry(Base):
     hours_billable: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0)
     hours_payable: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0)
     status: Mapped[str] = mapped_column(String(32), default="RASCUNHO")
+    submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    auto_approved: Mapped[bool] = mapped_column(Boolean, default=False)
+    allow_extra_billable: Mapped[bool] = mapped_column(Boolean, default=False)
+    adjustment_note: Mapped[Optional[str]] = mapped_column(String(255))
+    tacit_accepted: Mapped[bool] = mapped_column(Boolean, default=False)
 
     shift: Mapped[Shift] = relationship(back_populates="time_entries")
     history: Mapped[list[TimeStateHistory]] = relationship(back_populates="time_entry", cascade="all, delete-orphan")
@@ -379,3 +387,141 @@ class Substitution(Base):
     shift: Mapped[Shift] = relationship()
     planned_employee: Mapped[Employee] = relationship(foreign_keys=[planned_employee_id])
     executed_employee: Mapped[Employee] = relationship(foreign_keys=[executed_employee_id])
+
+
+class BillingPeriod(Base):
+    """Monthly fixed calendar settlement period (Q15)."""
+
+    __tablename__ = "billing_periods"
+    __table_args__ = (UniqueConstraint("organization_id", "year", "month", "service_area"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    month: Mapped[int] = mapped_column(Integer, nullable=False)
+    service_area: Mapped[str] = mapped_column(String(32), nullable=False)
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="ABERTO")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    drafts: Mapped[list[BillingDraft]] = relationship(back_populates="period", cascade="all, delete-orphan")
+
+
+class BillingDraft(Base):
+    __tablename__ = "billing_drafts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    period_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("billing_periods.id"), nullable=False, index=True)
+    client_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("clients.id"), nullable=False, index=True)
+    contract_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("contracts.id"))
+    status: Mapped[str] = mapped_column(String(32), default="RASCUNHO")
+    currency: Mapped[str] = mapped_column(String(3), default="EUR")
+    total_net: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    total_vat: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    total_gross: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    vat_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("23.00"))
+    cost_center: Mapped[Optional[str]] = mapped_column(String(64))
+    notes: Mapped[Optional[str]] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    period: Mapped[BillingPeriod] = relationship(back_populates="drafts")
+    lines: Mapped[list[BillingDraftLine]] = relationship(back_populates="draft", cascade="all, delete-orphan")
+    client: Mapped[Client] = relationship()
+
+
+class BillingDraftLine(Base):
+    __tablename__ = "billing_draft_lines"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    draft_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("billing_drafts.id"), nullable=False, index=True)
+    contract_line_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("contract_lines.id"))
+    article_code: Mapped[str] = mapped_column(String(64), default="SERV_FIELD")
+    description: Mapped[str] = mapped_column(String(255), nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    unit_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    line_net: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    billing_model: Mapped[str] = mapped_column(String(32), nullable=False)
+    capped: Mapped[bool] = mapped_column(Boolean, default=True)
+    extra_override: Mapped[bool] = mapped_column(Boolean, default=False)
+    extra_reason: Mapped[Optional[str]] = mapped_column(String(255))
+    cost_center: Mapped[Optional[str]] = mapped_column(String(64))
+
+    draft: Mapped[BillingDraft] = relationship(back_populates="lines")
+
+
+class CostEntry(Base):
+    """Direct costs for expected margin (MVP-27)."""
+
+    __tablename__ = "cost_entries"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    contract_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("contracts.id"), nullable=False, index=True)
+    contract_line_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("contract_lines.id"))
+    cost_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    period_year: Mapped[Optional[int]] = mapped_column(Integer)
+    period_month: Mapped[Optional[int]] = mapped_column(Integer)
+    notes: Mapped[Optional[str]] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PayrollPeriod(Base):
+    """Monthly calendar payroll/settlement period (Q15)."""
+
+    __tablename__ = "payroll_periods"
+    __table_args__ = (UniqueConstraint("organization_id", "year", "month"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    month: Mapped[int] = mapped_column(Integer, nullable=False)
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="ABERTO")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    statements: Mapped[list[PayrollStatement]] = relationship(back_populates="period", cascade="all, delete-orphan")
+
+
+class PayrollStatement(Base):
+    """One settlement row — export Cliente, Horas, Valor (Q13)."""
+
+    __tablename__ = "payroll_statements"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    period_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("payroll_periods.id"), nullable=False, index=True)
+    employee_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("employees.id"), nullable=False, index=True)
+    client_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("clients.id"))
+    client_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    hours: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    engagement_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    hourly_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 2))
+    currency: Mapped[str] = mapped_column(String(3), default="EUR")
+
+    period: Mapped[PayrollPeriod] = relationship(back_populates="statements")
+    employee: Mapped[Employee] = relationship()
+
+
+class ErpExportBatch(Base):
+    """PHC file export batch stub (Q01 / Q16 / Q17)."""
+
+    __tablename__ = "erp_export_batches"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    batch_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="PENDING")
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    row_count: Mapped[int] = mapped_column(Integer, default=0)
+    period_label: Mapped[Optional[str]] = mapped_column(String(64))
+    error_message: Mapped[Optional[str]] = mapped_column(String(255))
+    created_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

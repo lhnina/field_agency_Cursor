@@ -12,6 +12,8 @@ import {
   Search,
   LogOut,
   CalendarOff,
+  Clock3,
+  Wallet,
 } from "lucide-react";
 import { useAuth } from "@/api/auth";
 import { initials } from "@/lib/labels";
@@ -23,6 +25,7 @@ const NAV = [
       { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
       { to: "/planeamento", label: "Planeamento", icon: CalendarDays },
       { to: "/ausencias", label: "Ausências", icon: CalendarOff },
+      { to: "/horas", label: "Validação horas", icon: Clock3 },
       { to: "/colaboradores", label: "Colaboradores", icon: Users },
       { to: "/contratos", label: "Contratos", icon: FileText },
     ],
@@ -37,6 +40,7 @@ const NAV = [
   {
     section: "Gestão",
     items: [
+      { to: "/faturacao", label: "Pré-faturação / PHC", icon: Wallet },
       { to: "/rentabilidade", label: "Rentabilidade", icon: BarChart3 },
       { to: "/definicoes", label: "Definições", icon: Settings },
     ],

@@ -2,37 +2,36 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/api/auth";
 import { apiFetch } from "@/api/client";
-import type { AlertItem, Contract, Employee, PlanningWeek } from "@/api/types";
+import type { AlertItem, DashboardKpis } from "@/api/types";
 
 export function DashboardPage() {
   const { token, user } = useAuth();
-  const [stats, setStats] = useState({ contracts: 0, employees: 0, shifts: 0, unassigned: 0 });
+  const [kpis, setKpis] = useState<DashboardKpis | null>(null);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
 
   useEffect(() => {
     if (!token) return;
     Promise.all([
-      apiFetch<Contract[]>("/contracts", { token }),
-      apiFetch<Employee[]>("/employees", { token }),
-      apiFetch<PlanningWeek>("/planning/week?week_start=2026-11-02", { token }),
+      apiFetch<DashboardKpis>("/dashboard/kpis?week_start=2026-11-02&year=2026&month=11", { token }),
       apiFetch<AlertItem[]>("/alerts?week_start=2026-11-02", { token }),
-    ]).then(([contracts, employees, week, alertList]) => {
-      setStats({
-        contracts: contracts.length,
-        employees: employees.length,
-        shifts: week.shifts.length,
-        unassigned: week.unassigned_count ?? week.shifts.filter((s) => s.assignments.length === 0).length,
-      });
-      setAlerts(alertList);
+    ]).then(([k, a]) => {
+      setKpis(k);
+      setAlerts(a);
     });
   }, [token]);
 
-  const kpis = [
-    { label: "Contratos ativos", value: String(stats.contracts) },
-    { label: "Colaboradores", value: String(stats.employees) },
-    { label: "Turnos (sem. 45)", value: String(stats.shifts) },
-    { label: "Sem recurso", value: String(stats.unassigned), warn: true },
-  ];
+  const cards = kpis
+    ? [
+        { label: "Contratos", value: String(kpis.contracts) },
+        { label: "Colaboradores", value: String(kpis.employees) },
+        { label: "Turnos (sem.)", value: String(kpis.shifts_week) },
+        { label: "Sem recurso", value: String(kpis.unassigned_week), warn: true },
+        { label: "Pend. validação", value: String(kpis.pending_validation), warn: true },
+        { label: "Horas aprovadas", value: Number(kpis.approved_hours_month).toFixed(1) },
+        { label: "Margem prev. €", value: Number(kpis.expected_margin_total).toFixed(0) },
+        { label: "Exports PHC", value: String(kpis.export_batches) },
+      ]
+    : [];
 
   const severityClass: Record<string, string> = {
     danger: "border-fo-danger/30 bg-fo-danger-subtle text-fo-danger",
@@ -45,11 +44,11 @@ export function DashboardPage() {
       <div>
         <h1 className="text-[22px] font-bold tracking-tight">Dashboard operacional</h1>
         <p className="text-[13.5px] text-fo-ink-secondary">
-          Olá, {user?.full_name.split(" ")[0]} — resumo da semana demo (2–8 nov 2026).
+          Olá, {user?.full_name.split(" ")[0]} — KPIs semana 45 + fecho nov/2026.
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {kpis.map((kpi) => (
+        {cards.map((kpi) => (
           <div key={kpi.label} className="fo-panel px-4 py-3">
             <div className="text-[12px] font-semibold text-fo-ink-muted">{kpi.label}</div>
             <div
@@ -66,9 +65,7 @@ export function DashboardPage() {
       <div className="fo-panel p-4">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-base font-bold">Alertas</h2>
-          <span className="text-[12px] text-fo-ink-muted">
-            Docs · sem recurso · CT informativo (Q20)
-          </span>
+          <span className="text-[12px] text-fo-ink-muted">Docs · sem recurso · CT (Q20)</span>
         </div>
         <ul className="mt-3 space-y-2">
           {alerts.length === 0 && (
@@ -90,16 +87,16 @@ export function DashboardPage() {
         <h2 className="text-base font-bold">Atalhos</h2>
         <div className="mt-3 flex flex-wrap gap-2">
           <Link to="/planeamento" className="fo-btn-primary">
-            Abrir planeamento
+            Planeamento
           </Link>
-          <Link to="/ausencias" className="fo-btn-secondary">
-            Ausências
+          <Link to="/horas" className="fo-btn-secondary">
+            Validar horas
           </Link>
-          <Link to="/contratos" className="fo-btn-secondary">
-            Ver contratos
+          <Link to="/faturacao" className="fo-btn-secondary">
+            Pré-faturação / PHC
           </Link>
-          <Link to="/colaboradores" className="fo-btn-secondary">
-            Colaboradores
+          <Link to="/rentabilidade" className="fo-btn-secondary">
+            Rentabilidade
           </Link>
         </div>
       </div>

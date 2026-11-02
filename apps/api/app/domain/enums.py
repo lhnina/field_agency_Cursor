@@ -98,3 +98,38 @@ class AlertKind(StrEnum):
     DOC_EXPIRED = "DOC_EXPIRED"
     OVERLAP = "OVERLAP"
     CT_HOURS = "CT_HOURS"  # alerts only (Q20)
+    PENDING_VALIDATION = "PENDING_VALIDATION"
+    BILLING_DRAFT = "BILLING_DRAFT"
+
+
+class PeriodStatus(StrEnum):
+    ABERTO = "ABERTO"
+    EM_APURAMENTO = "EM_APURAMENTO"
+    FECHADO = "FECHADO"
+
+
+class DraftStatus(StrEnum):
+    RASCUNHO = "RASCUNHO"
+    APROVADO = "APROVADO"
+    EXPORTADO = "EXPORTADO"
+
+
+class ExportBatchType(StrEnum):
+    FATURACAO = "FATURACAO"
+    REMUNERACAO = "REMUNERACAO"
+
+
+class ExportBatchStatus(StrEnum):
+    PENDING = "PENDING"
+    SENT = "SENT"
+    ACKED = "ACKED"
+    ERROR = "ERROR"
+
+
+class ServiceArea(StrEnum):
+    """Billing separated by service area (architecture §)."""
+
+    REPOSICAO = "REPOSICAO"
+    PROMOCAO = "PROMOCAO"
+    LOGISTICA = "LOGISTICA"
+    EQUIPAS_FIXAS = "EQUIPAS_FIXAS"
