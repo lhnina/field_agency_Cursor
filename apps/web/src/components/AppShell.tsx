@@ -11,6 +11,7 @@ import {
   Bell,
   Search,
   LogOut,
+  CalendarOff,
 } from "lucide-react";
 import { useAuth } from "@/api/auth";
 import { initials } from "@/lib/labels";
@@ -21,6 +22,7 @@ const NAV = [
     items: [
       { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
       { to: "/planeamento", label: "Planeamento", icon: CalendarDays },
+      { to: "/ausencias", label: "Ausências", icon: CalendarOff },
       { to: "/colaboradores", label: "Colaboradores", icon: Users },
       { to: "/contratos", label: "Contratos", icon: FileText },
     ],

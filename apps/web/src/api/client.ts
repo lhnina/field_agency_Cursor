@@ -26,14 +26,25 @@ export async function apiFetch<T>(
     },
   });
   if (!res.ok) {
-    let detail = res.statusText;
+    let detail: unknown = res.statusText;
     try {
       const data = await res.json();
-      detail = data.detail ?? JSON.stringify(data);
+      detail = data.detail ?? data;
     } catch {
       /* ignore */
     }
-    throw new ApiError(res.status, typeof detail === "string" ? detail : "Erro de API");
+    let message = "Erro de API";
+    if (typeof detail === "string") message = detail;
+    else if (detail && typeof detail === "object" && "message" in detail) {
+      message = String((detail as { message: string }).message);
+    } else {
+      try {
+        message = JSON.stringify(detail);
+      } catch {
+        /* ignore */
+      }
+    }
+    throw new ApiError(res.status, message);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;

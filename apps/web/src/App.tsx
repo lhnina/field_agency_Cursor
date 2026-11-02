@@ -10,6 +10,7 @@ import { ClientsPage } from "@/pages/ClientsPage";
 import { StoresPage } from "@/pages/StoresPage";
 import { ProfitabilityPage } from "@/pages/ProfitabilityPage";
 import { SettingsPage } from "@/pages/SettingsPage";
+import { AbsencesPage } from "@/pages/AbsencesPage";
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { token, loading } = useAuth();
@@ -38,6 +39,7 @@ export function App() {
       >
         <Route index element={<DashboardPage />} />
         <Route path="planeamento" element={<PlanningPage />} />
+        <Route path="ausencias" element={<AbsencesPage />} />
         <Route path="colaboradores" element={<EmployeesPage />} />
         <Route path="contratos" element={<ContractsPage />} />
         <Route path="clientes" element={<ClientsPage />} />
