@@ -1,8 +1,11 @@
 from app.domain.enums import (
+    AbsenceStatus,
     AbsenceType,
+    AlertKind,
     BillingModel,
     ContractStatus,
     ContractType,
+    DocumentStatus,
     EngagementType,
     HourConcept,
     RoleCode,
@@ -11,10 +14,13 @@ from app.domain.enums import (
 )
 
 __all__ = [
+    "AbsenceStatus",
     "AbsenceType",
+    "AlertKind",
     "BillingModel",
     "ContractStatus",
     "ContractType",
+    "DocumentStatus",
     "EngagementType",
     "HourConcept",
     "RoleCode",

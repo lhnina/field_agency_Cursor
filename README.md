@@ -4,16 +4,19 @@ Produto provisório **FieldOps** (Q36 aberto) · UI em **PT-PT** · identidade *
 
 Monólito modular: React + TypeScript + Tailwind (web) · FastAPI + PostgreSQL (API).
 
-## O que este PR inclui (PR1 foundation)
+## PRs
 
-- Scaffold `apps/web` + `apps/api` + `docker-compose` (Postgres)
-- Auth JWT + stub RBAC com **7 perfis** seedados
-- CRUD mínimo: Organization, Client, Brand, RetailChain/Store, Collaborator
-- Contratos tipados (`REPOSICAO|PROMOCAO|LOGISTICA|EQUIPAS_FIXAS`) + linhas + versionamento stub
-- ServicePlan + geração de turnos (stub) + vista semanal de planeamento
-- Modelo das **7 horas** no domínio (`time_entries` + `time_state_history`)
-- Tokens Atlantic Ops aplicados na UI
-- Seed demo PT (semana 45 · 2–8 nov 2026)
+- **PR1** — foundation (scaffold, auth/RBAC, cadastro, contratos, planeamento shell, 7 horas, seed)
+- **PR2** — planning ops (afetação estável, overlap, ausências, substituições, alertas docs, CI)
+
+### PR2 (planning ops)
+
+- Afetação estável no plano + UI lista/atribuir (Q04 / Q30)
+- Overlap hard-block na afetação + alertas de serviços sem recurso
+- Ausências (pedido + aprovação) com bloqueio visual no calendário
+- Substituições com histórico previsto vs executado
+- Alertas de documentos a expirar / expirados
+- CI GitHub Actions (pytest API + build web)
 
 ## Pré-requisitos
 

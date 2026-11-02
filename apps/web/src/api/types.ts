@@ -98,11 +98,46 @@ export type Shift = {
   assignments: Assignment[];
 };
 
+export type Absence = {
+  id: string;
+  organization_id: string;
+  employee_id: string;
+  employee_name?: string | null;
+  absence_type: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+  reason?: string | null;
+};
+
 export type PlanningWeek = {
   week_start: string;
   week_end: string;
   shifts: Shift[];
   employees: Employee[];
+  absences?: Absence[];
+  unassigned_count?: number;
+};
+
+export type AlertItem = {
+  kind: string;
+  severity: string;
+  title: string;
+  message: string;
+  entity_type: string;
+  entity_id: string;
+};
+
+export type Substitution = {
+  id: string;
+  shift_id: string;
+  planned_employee_id: string;
+  executed_employee_id: string;
+  planned_employee_name?: string | null;
+  executed_employee_name?: string | null;
+  reason?: string | null;
+  absence_id?: string | null;
+  created_at: string;
 };
 
 export type TimeEntry = {

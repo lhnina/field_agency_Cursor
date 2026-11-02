@@ -78,3 +78,23 @@ class AbsenceType(StrEnum):
     FERIAS = "FERIAS"
     FALTA = "FALTA"
     INDISPONIBILIDADE = "INDISPONIBILIDADE"
+
+
+class AbsenceStatus(StrEnum):
+    PEDIDO = "PEDIDO"
+    APROVADO = "APROVADO"
+    REJEITADO = "REJEITADO"
+
+
+class DocumentStatus(StrEnum):
+    VALIDO = "VALIDO"
+    EXPIRADO = "EXPIRADO"
+    PENDENTE = "PENDENTE"
+
+
+class AlertKind(StrEnum):
+    UNASSIGNED_SHIFT = "UNASSIGNED_SHIFT"
+    DOC_EXPIRING = "DOC_EXPIRING"
+    DOC_EXPIRED = "DOC_EXPIRED"
+    OVERLAP = "OVERLAP"
+    CT_HOURS = "CT_HOURS"  # alerts only (Q20)

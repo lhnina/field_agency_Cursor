@@ -320,3 +320,62 @@ class TimeStateHistory(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     time_entry: Mapped[TimeEntry] = relationship(back_populates="history")
+
+
+class Absence(Base):
+    """Leave / unavailability — approvals minimal (MVP-15). Equipas fixas use absences (Q06)."""
+
+    __tablename__ = "absences"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    employee_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("employees.id"), nullable=False, index=True)
+    absence_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="PEDIDO")
+    reason: Mapped[Optional[str]] = mapped_column(String(255))
+    decided_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
+    decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    employee: Mapped[Employee] = relationship()
+
+
+class EmployeeDocument(Base):
+    """Collaborator documents with expiry — alerts only in MVP (MVP-07)."""
+
+    __tablename__ = "employee_documents"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    employee_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("employees.id"), nullable=False, index=True)
+    doc_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    label: Mapped[Optional[str]] = mapped_column(String(200))
+    expires_on: Mapped[Optional[date]] = mapped_column(Date)
+    status: Mapped[str] = mapped_column(String(32), default="VALIDO")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    employee: Mapped[Employee] = relationship()
+
+
+class Substitution(Base):
+    """Planned vs executed history for a shift replacement (MVP-16 stub)."""
+
+    __tablename__ = "substitutions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    shift_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("shifts.id"), nullable=False, index=True)
+    planned_employee_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("employees.id"), nullable=False)
+    executed_employee_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("employees.id"), nullable=False)
+    original_assignment_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("assignments.id"))
+    new_assignment_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("assignments.id"))
+    reason: Mapped[Optional[str]] = mapped_column(String(255))
+    absence_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("absences.id"))
+    created_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    shift: Mapped[Shift] = relationship()
+    planned_employee: Mapped[Employee] = relationship(foreign_keys=[planned_employee_id])
+    executed_employee: Mapped[Employee] = relationship(foreign_keys=[executed_employee_id])

@@ -9,14 +9,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.security import hash_password
-from app.domain.enums import ContractType, RoleCode
+from app.domain.enums import AbsenceStatus, AbsenceType, ContractType, DocumentStatus, RoleCode
 from app.models import (
+    Absence,
     Brand,
     Client,
     Contract,
     ContractLine,
     ContractVersion,
     Employee,
+    EmployeeDocument,
     Organization,
     Permission,
     RetailChain,
@@ -489,6 +491,61 @@ def seed_all(db: Session) -> Organization:
                 author_user_id=admin.id,
             )
         )
+
+    # Absences — Bruno on leave week 45 (approved); pending request for Inês
+    db.add(
+        Absence(
+            organization_id=org.id,
+            employee_id=bruno.id,
+            absence_type=AbsenceType.FERIAS,
+            start_date=week_start,
+            end_date=week_start + timedelta(days=6),
+            status=AbsenceStatus.APROVADO,
+            reason="Férias · 2–8 nov",
+            decided_by_user_id=admin.id,
+        )
+    )
+    db.add(
+        Absence(
+            organization_id=org.id,
+            employee_id=ines.id,
+            absence_type=AbsenceType.INDISPONIBILIDADE,
+            start_date=week_start + timedelta(days=4),
+            end_date=week_start + timedelta(days=4),
+            status=AbsenceStatus.PEDIDO,
+            reason="Consulta médica",
+        )
+    )
+
+    # Documents — some expiring soon for dashboard alerts (MVP-07)
+    db.add_all(
+        [
+            EmployeeDocument(
+                organization_id=org.id,
+                employee_id=ana.id,
+                doc_type="CARTAO_CIDADAO",
+                label="CC Ana",
+                expires_on=date(2027, 5, 1),
+                status=DocumentStatus.VALIDO,
+            ),
+            EmployeeDocument(
+                organization_id=org.id,
+                employee_id=carla.id,
+                doc_type="CERTIFICADO_HACCP",
+                label="HACCP",
+                expires_on=date(2026, 11, 15),
+                status=DocumentStatus.VALIDO,
+            ),
+            EmployeeDocument(
+                organization_id=org.id,
+                employee_id=diogo.id,
+                doc_type="ATESTADO_MEDICO",
+                label="Atestado aptidão",
+                expires_on=date(2026, 10, 20),
+                status=DocumentStatus.EXPIRADO,
+            ),
+        ]
+    )
 
     db.commit()
 

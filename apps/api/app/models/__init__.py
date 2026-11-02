@@ -1,4 +1,5 @@
 from app.models.entities import (
+    Absence,
     Assignment,
     Brand,
     Client,
@@ -6,6 +7,7 @@ from app.models.entities import (
     ContractLine,
     ContractVersion,
     Employee,
+    EmployeeDocument,
     Organization,
     Permission,
     RetailChain,
@@ -14,6 +16,7 @@ from app.models.entities import (
     ServicePlan,
     Shift,
     Store,
+    Substitution,
     TimeEntry,
     TimeStateHistory,
     User,
@@ -21,6 +24,7 @@ from app.models.entities import (
 )
 
 __all__ = [
+    "Absence",
     "Assignment",
     "Brand",
     "Client",
@@ -28,6 +32,7 @@ __all__ = [
     "ContractLine",
     "ContractVersion",
     "Employee",
+    "EmployeeDocument",
     "Organization",
     "Permission",
     "RetailChain",
@@ -36,6 +41,7 @@ __all__ = [
     "ServicePlan",
     "Shift",
     "Store",
+    "Substitution",
     "TimeEntry",
     "TimeStateHistory",
     "User",

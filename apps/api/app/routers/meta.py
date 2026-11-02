@@ -4,7 +4,15 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
 from app.db import get_db
-from app.domain.enums import ContractType, HourConcept, RoleCode, ShiftStatus
+from app.domain.enums import (
+    AbsenceStatus,
+    AbsenceType,
+    AlertKind,
+    ContractType,
+    HourConcept,
+    RoleCode,
+    ShiftStatus,
+)
 from app.models import Role, User
 from app.schemas.common import RoleOut
 
@@ -23,10 +31,14 @@ def enums(_: User = Depends(get_current_user)) -> dict:
         "contract_types": [c.value for c in ContractType],
         "shift_statuses": [s.value for s in ShiftStatus],
         "hour_concepts": [h.value for h in HourConcept],
+        "absence_types": [a.value for a in AbsenceType],
+        "absence_statuses": [a.value for a in AbsenceStatus],
+        "alert_kinds": [a.value for a in AlertKind],
         "notes": {
             "ct": "Alertas apenas no MVP (Q20)",
             "equipas_fixas": "Faturação mensal + ausências; sem turnos diários (Q06)",
-            "assignment": "Afetação estável ao nível do planeamento (Q04)",
+            "assignment": "Afetação estável ao nível do planeamento (Q04 / Q30 lista+atribuir)",
             "platform": "Plataforma é master operacional; export PHC mais tarde (Q01)",
+            "overlap": "Sobreposição ativa = hard block (override auditado opcional)",
         },
     }

@@ -256,6 +256,8 @@ class PlanningWeekOut(BaseModel):
     week_end: date
     shifts: list[ShiftOut]
     employees: list[EmployeeOut]
+    absences: list["AbsenceOut"] = []
+    unassigned_count: int = 0
 
 
 class RoleOut(ORMModel):
@@ -263,3 +265,84 @@ class RoleOut(ORMModel):
     code: str
     name: str
     description: Optional[str]
+
+
+class AssignShiftIn(BaseModel):
+    employee_id: uuid.UUID
+    set_as_stable_default: bool = False
+    allow_overlap_override: bool = False
+
+
+class StableAssigneeIn(BaseModel):
+    default_employee_id: Optional[uuid.UUID] = None
+
+
+class SubstituteIn(BaseModel):
+    substitute_employee_id: uuid.UUID
+    reason: Optional[str] = None
+    absence_id: Optional[uuid.UUID] = None
+    allow_overlap_override: bool = False
+
+
+class SubstitutionOut(ORMModel):
+    id: uuid.UUID
+    shift_id: uuid.UUID
+    planned_employee_id: uuid.UUID
+    executed_employee_id: uuid.UUID
+    planned_employee_name: Optional[str] = None
+    executed_employee_name: Optional[str] = None
+    reason: Optional[str]
+    absence_id: Optional[uuid.UUID]
+    created_at: datetime
+
+
+class AbsenceCreate(BaseModel):
+    employee_id: uuid.UUID
+    absence_type: str
+    start_date: date
+    end_date: date
+    reason: Optional[str] = None
+
+
+class AbsenceDecideIn(BaseModel):
+    status: str  # APROVADO | REJEITADO
+
+
+class AbsenceOut(ORMModel):
+    id: uuid.UUID
+    organization_id: uuid.UUID
+    employee_id: uuid.UUID
+    employee_name: Optional[str] = None
+    absence_type: str
+    start_date: date
+    end_date: date
+    status: str
+    reason: Optional[str]
+
+
+class EmployeeDocumentCreate(BaseModel):
+    employee_id: uuid.UUID
+    doc_type: str
+    label: Optional[str] = None
+    expires_on: Optional[date] = None
+    status: str = "VALIDO"
+
+
+class EmployeeDocumentOut(ORMModel):
+    id: uuid.UUID
+    organization_id: uuid.UUID
+    employee_id: uuid.UUID
+    employee_name: Optional[str] = None
+    doc_type: str
+    label: Optional[str]
+    expires_on: Optional[date]
+    status: str
+
+
+class AlertOut(BaseModel):
+    kind: str
+    severity: str
+    title: str
+    message: str
+    entity_type: str
+    entity_id: str
