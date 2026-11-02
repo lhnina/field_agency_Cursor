@@ -27,6 +27,7 @@ jobs:
       run:
         working-directory: apps/api
     env:
+      PYTHONPATH: .
       DATABASE_URL: postgresql+psycopg2://fieldops:fieldops@localhost:5432/fieldops_test
       TEST_DATABASE_URL: postgresql+psycopg2://fieldops:fieldops@localhost:5432/fieldops_test
       SEED_ON_STARTUP: "false"
